@@ -1,0 +1,7 @@
+2025-04-03 12:39:38 [INFO] LoginPage - Открытие https://www.google.com/?hl=ru страницы
+2025-04-03 12:39:38 [INFO] LoginPage - Открыта https://www.google.com/?hl=ru страница
+2025-04-03 12:39:39 [INFO] LoginPage - Нажата кнопка поиска
+2025-04-03 12:39:39 [INFO] LoginPage - Это информационное сообщение
+2025-04-03 12:39:39 [WARNING] LoginPage - Это предупреждение
+2025-04-03 12:39:39 [ERROR] LoginPage - Это сообщение об ошибке
+2025-04-03 12:39:39 [CRITICAL] LoginPage - Это критическое сообщение
