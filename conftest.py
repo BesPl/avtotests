@@ -2,18 +2,20 @@ import pytest
 import allure
 import os
 from selenium import webdriver
+from datetime import datetime
 
 
 @pytest.fixture(scope="session", autouse=True)
 def driver(request):
-    """Фикстура для инициализации WebDriver (сессионная область видимости)."""
     options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")  # Полноэкранный режим
-    # options.add_argument("--headless=new")  # Запуск в фоне (без отображения окна)
-    # options.add_argument("--disable-gpu")  # Отключение GPU (для headless)
-    driver_instance = webdriver.Chrome(options=options)
-    yield driver_instance
-    driver_instance.quit()
+    # options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
+    # options.add_argument("--incognito") #когда открывается в инкогнито
+    driver = webdriver.Chrome(options=options)
+    yield driver
+    driver.quit()
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_function(request, driver):
@@ -28,17 +30,18 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     rep = outcome.get_result()
     if rep.when == "call" and rep.failed:
-        driver = item.cls.driver if hasattr(item, "cls") else None
+        driver = getattr(item, "driver", None) or getattr(item.cls, "driver", None)
         if driver:
-            # Создаем папку для скриншотов, если она не существует
-            screenshots_dir = "screenshots"
+            # Создаем скриншот с уникальным именем
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_name = f"failure_{item.name}_{timestamp}"
+
+            # Сохраняем скриншот в файл
+            screenshots_dir = os.path.join("screenshots", datetime.now().strftime("%Y-%m-%d"))
             os.makedirs(screenshots_dir, exist_ok=True)
-            # Формируем имя файла и путь
-            screenshot_name = f"screenshot_{item.name}.png"
-            screenshot_path = os.path.join(screenshots_dir, screenshot_name)
-            # Сохраняем скриншот
-            driver.save_screenshot(screenshot_path)
-            # Прикрепляем скриншот к Allure-отчету
+            driver.save_screenshot(os.path.join(screenshots_dir, f"{screenshot_name}.png"))
+
+            # Прикрепляем к Allure
             allure.attach(
                 body=driver.get_screenshot_as_png(),
                 name=screenshot_name,

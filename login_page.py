@@ -7,10 +7,10 @@ import pytest
 
 class LoginPage(BasePage):
     PAGE_URL = "https://www.google.com/?hl=ru"
-    asd = (By.CSS_SELECTOR, '.gLFyf')
+    asd = (By.CSS_SELECTOR, '.gLFyff')
 
     def google_search(self):
-        self.wait.until(EC.element_to_be_clickable(self.asd)).click()
+        self.click_element(self.asd)
         self.logger.info("Нажата кнопка поиска")
         self.logger.debug("Это сообщение отладки")
         self.logger.info("Это информационное сообщение")

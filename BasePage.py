@@ -1,5 +1,6 @@
 import allure
 from logger_all import setup_logger
+from allure_commons.types import AttachmentType
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -16,5 +17,41 @@ class BasePage:
 
     def is_opened(self):#ожидание открытия страницы
         with allure.step(f"Page {self.PAGE_URL} is opened"):
-            self.wait.until(EC.url_to_be(self.PAGE_URL))
-            self.logger.info(f"Открыта {self.PAGE_URL} страница")
+            try:
+                self.wait.until(EC.url_to_be(self.PAGE_URL))
+                self.logger.info(f"Открыта {self.PAGE_URL} страница")
+            except Exception as e:
+                self.logger.error(f"Ошибка при открытии {self.PAGE_URL} страницы: {str(e)}")
+
+    def find_element(self, locator, timeout=10):
+        """Ожидает появление элемента и возвращает его"""
+        try:
+            return WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located(locator),
+                message=f"Элемент {locator} не найден за {timeout} секунд"
+            )
+        except Exception as e:
+            self.logger.error(f"Ошибка поиска элемента {locator}: {e}")
+
+    def enter_text(self, locator, text):
+        """Очищает поле и вводит текст"""
+        element = self.find_element(locator)
+        element.clear()
+        element.send_keys(text)
+        self.logger.info(f"Введено: '{text}' в элемент {locator}")
+
+    def click_element(self, locator):
+        """Кликает на элемент после проверки его кликабельности"""
+        element = WebDriverWait(self.driver, 10).until(
+            EC.element_to_be_clickable(locator),
+            message=f"Элемент {locator} не кликабелен"
+        )
+        element.click()
+        self.logger.info(f"Клик выполнен: {locator}")
+
+    def make_screenshot(self, screenshot_name):
+        allure.attach(
+            body=self.driver.get_screenshot_as_png(),
+            name=screenshot_name,
+            attachment_type=AttachmentType.PNG
+        )
