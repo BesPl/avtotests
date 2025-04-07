@@ -1,8 +1,11 @@
+#BasePage
 import allure
 from logger_all import setup_logger
 from allure_commons.types import AttachmentType
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+
 
 class BasePage:
     def __init__(self, driver):
@@ -47,7 +50,7 @@ class BasePage:
             message=f"Элемент {locator} не кликабелен"
         )
         element.click()
-        self.logger.info(f"Клик выполнен: {locator}")
+        self.logger.debug(f"Клик выполнен: {locator}")
 
     def make_screenshot(self, screenshot_name):
         allure.attach(
@@ -55,3 +58,16 @@ class BasePage:
             name=screenshot_name,
             attachment_type=AttachmentType.PNG
         )
+
+    def refresh(self):
+        """Обновляет страницу и проверяет её загрузку"""
+        self.logger.info("Выполняю обновление страницы")
+        self.driver.refresh()
+
+        # Явное ожидание перезагрузки страницы
+        self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        self.logger.info("Страница успешно обновлена")
+
+    def input_credentials(self, field_locator, value):
+        self.click_element(field_locator)
+        self.enter_text(field_locator, value)

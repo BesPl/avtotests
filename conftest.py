@@ -1,18 +1,32 @@
 import pytest
 import allure
 import os
+import json
 from selenium import webdriver
 from datetime import datetime
 
 
+
 @pytest.fixture(scope="session", autouse=True)
 def driver(request):
+    config = load_config()
+    browser_name = config["BROWSER"].lower()
+    headless = config["HEADLESS"]
+
     options = webdriver.ChromeOptions()
-    # options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
-    # options.add_argument("--incognito") #когда открывается в инкогнито
+
+    if headless:
+        options.add_argument("--headless=new")
+
+    if browser_name == "firefox":
+        driver_instance = webdriver.Firefox(options=options)
+    elif browser_name == "edge":
+        driver_instance = webdriver.Edge(options=options)
+    else:
+        driver_instance = webdriver.Chrome(options=options)
     driver = webdriver.Chrome(options=options)
     yield driver
     driver.quit()
@@ -47,3 +61,16 @@ def pytest_runtest_makereport(item, call):
                 name=screenshot_name,
                 attachment_type=allure.attachment_type.PNG
             )
+
+def load_config():
+    """Загрузка конфигурации из файла config.json с проверкой обязательных полей"""
+    try:
+        with open("config.json", "r") as f:
+            config = json.load(f)
+            required_fields = ["BROWSER", "HEADLESS"]
+            for field in required_fields:
+                if field not in config:
+                    config[field] = {"BROWSER": "chrome", "HEADLESS": True}[field]
+            return config
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"BROWSER": "chrome", "HEADLESS": True}

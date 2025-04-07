@@ -31,7 +31,7 @@ def setup_logger(name):
 
     # Создание логгера
     logger = logging.getLogger(name)  # Используем переданное имя
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     # Обработчик для терминала (только ошибки)
     console_handler = logging.StreamHandler()

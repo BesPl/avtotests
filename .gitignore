@@ -3,3 +3,7 @@
 logs
 pytest-cache-files-acv3jdly
 __pycache__
+.env
+screenshots
+allure-report
+allure-results
