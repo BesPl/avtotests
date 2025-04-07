@@ -21,15 +21,17 @@ def driver(request):
     if headless:
         options.add_argument("--headless=new")
 
+    # Создаем драйвер в зависимости от выбранного браузера
     if browser_name == "firefox":
         driver_instance = webdriver.Firefox(options=options)
     elif browser_name == "edge":
         driver_instance = webdriver.Edge(options=options)
     else:
         driver_instance = webdriver.Chrome(options=options)
-    driver = webdriver.Chrome(options=options)
-    yield driver
-    driver.quit()
+
+    # Используем один экземпляр драйвера
+    yield driver_instance
+    driver_instance.quit()
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_function(request, driver):

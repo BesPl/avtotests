@@ -1,3 +1,5 @@
+import time
+
 from Base.BasePage import BasePage
 from config.links import Links
 from selenium.webdriver.common.by import By
@@ -75,6 +77,32 @@ class LoginPage(BasePage):
             self.logger.error(f"Фактический текст ошибки: {self.find_element(self.error_text).text}")
             raise  # Повторно выбрасываем исключение, чтобы тест был помечен как неудачный
 
+    @allure.step("Проверка ошибки при нажатии кнопки входа без логина и пароля")
+    def username_required(self):
+        try:
+            actual_error = self.find_element(self.error_text).text
+            assert actual_error == "Epic sadface: Username is required", \
+                f"Ожидалось сообщение 'Epic sadface: Username is required', но получено '{actual_error}'"
+            self.logger.info("Текст ошибки корректный")
+        except AssertionError as e:
+            # Логируем фактический текст ошибки
+            self.logger.error(f"Ошибка проверки текста: {e}")
+            self.logger.error(f"Фактический текст ошибки: {self.find_element(self.error_text).text}")
+            raise  # Повторно выбрасываем исключение, чтобы тест был помечен как неудачный
+
+    @allure.step(f"Проверка ошибки при переходе на страницу {Links.INVENTORY_PAGE} без авторизации")
+    def access_wthen_not_liggin(self):
+        try:
+            actual_error = self.find_element(self.error_text).text
+            assert actual_error == "Epic sadface: You can only access '/inventory.html' when you are logged in.", \
+                f"Ожидалось сообщение 'Epic sadface: You can only access '/inventory.html' when you are logged in.', но получено '{actual_error}'"
+            self.logger.info("Текст ошибки корректный")
+        except AssertionError as e:
+            # Логируем фактический текст ошибки
+            self.logger.error(f"Ошибка проверки текста: {e}")
+            self.logger.error(f"Фактический текст ошибки: {self.find_element(self.error_text).text}")
+            raise  # Повторно выбрасываем исключение, чтобы тест был помечен как неудачный
+
     @allure.step("Выполнение корректной авторизации")
     def corect_login(self):
         self.input_corect_login()
@@ -96,3 +124,9 @@ class LoginPage(BasePage):
         self.click_login_button()
         self.check_error_locked_out()
         self.click_error_button()
+
+    @allure.step("Проверка входа без ввода логи и пароля")
+    def try_com_page_without_login(self):
+        self.click_login_button()
+        self.username_required()
+

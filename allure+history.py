@@ -8,7 +8,7 @@ HISTORY_DIR = os.path.join(ALLURE_REPORT, "history")
 TARGET_HISTORY_DIR = os.path.join(ALLURE_RESULTS, "history")
 
 # Запуск тестов
-subprocess.run(["pytest", "asd.py", "--alluredir=./allure-results"], check=True)
+subprocess.run(["pytest", "Tests.py", "--alluredir=./allure-results"], check=True)
 
 # Копирование history с заменой старой папки
 if os.path.exists(HISTORY_DIR):

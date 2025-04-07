@@ -32,19 +32,19 @@ def setup_logger(name):
     # Создание логгера
     logger = logging.getLogger(name)  # Используем переданное имя
     logger.setLevel(logging.DEBUG)
+    if not logger.handlers:
+        # Обработчик для терминала (только ошибки)
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(log_format)
+        console_handler.setLevel(logging.ERROR)
+        logger.addHandler(console_handler)
 
-    # Обработчик для терминала (только ошибки)
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(log_format)
-    console_handler.setLevel(logging.ERROR)
-    logger.addHandler(console_handler)
-
-    # Обработчик для файла
-    file_name = f"{datetime.now().strftime('%H-%M-%S')}.log"
-    file_handler = logging.FileHandler(os.path.join(log_path, file_name), encoding="utf-8")
-    file_handler.setFormatter(log_format)
-    file_handler.setLevel(logging.DEBUG)
-    logger.addHandler(file_handler)
+        # Обработчик для файла
+        file_name = f"{datetime.now().strftime('%H-%M')}.log"
+        file_handler = logging.FileHandler(os.path.join(log_path, file_name), encoding="utf-8")
+        file_handler.setFormatter(log_format)
+        file_handler.setLevel(logging.DEBUG)
+        logger.addHandler(file_handler)
 
     return logger
 

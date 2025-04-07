@@ -25,6 +25,7 @@ class BasePage:
                 self.logger.info(f"Открыта {self.PAGE_URL} страница")
             except Exception as e:
                 self.logger.error(f"Ошибка при открытии {self.PAGE_URL} страницы: {str(e)}")
+                self.logger.error(f"Текущий URL: {self.driver.current_url}")
 
     def find_element(self, locator, timeout=10):
         """Ожидает появление элемента и возвращает его"""
@@ -71,3 +72,28 @@ class BasePage:
     def input_credentials(self, field_locator, value):
         self.click_element(field_locator)
         self.enter_text(field_locator, value)
+
+    def check_text_message(self, locator, expected_text):
+        """
+        Проверяет текст элемента.
+        :param locator: Локатор элемента (например, (By.CLASS_NAME, "error-message-container"))
+        :param expected_text: Ожидаемый текст для сравнения
+        """
+        try:
+            # Находим элемент с текстом
+            text_element = self.find_element(locator)  # Ищем элемент по локатору
+            actual_text = text_element.text
+
+            # Сравниваем фактический текст с ожидаемым
+            assert actual_text == expected_text, \
+                f"Ожидалось сообщение '{expected_text}', но получено '{actual_text}'"
+
+            # Логируем успешную проверку
+            self.logger.info(f"Текст корректный: '{actual_text}'")
+
+        except AssertionError as e:
+            # Логируем ошибку и фактический текст
+            self.logger.error(f"Ошибка проверки текста: {e}")
+            self.logger.error(f"Фактический текст: '{actual_text}'")
+            raise  # Перебрасываем исключение для пометки теста как упавшего
+
