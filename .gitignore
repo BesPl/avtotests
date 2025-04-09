@@ -1,5 +1,4 @@
 .pytest_cache
-.idea
 logs
 pytest-cache-files-acv3jdly
 __pycache__
@@ -7,3 +6,4 @@ __pycache__
 screenshots
 allure-report
 allure-results
+.idea
