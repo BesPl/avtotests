@@ -1,6 +1,9 @@
 #BasePage
 import allure
+import os
 from logger_all import setup_logger
+from allure_commons.types import AttachmentType
+from datetime import datetime
 from allure_commons.types import AttachmentType
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -19,7 +22,7 @@ class BasePage:
             self.logger.info(f"Открытие {self.PAGE_URL} страницы")
 
     def is_opened(self):#ожидание открытия страницы
-        with allure.step(f"Page {self.PAGE_URL} is opened"):
+        with allure.step(f"Страница  {self.PAGE_URL} открыта"):
             try:
                 self.wait.until(EC.url_to_be(self.PAGE_URL))
                 self.logger.info(f"Открыта {self.PAGE_URL} страница")
@@ -54,11 +57,25 @@ class BasePage:
         self.logger.debug(f"Клик выполнен: {locator}")
 
     def make_screenshot(self, screenshot_name):
-        allure.attach(
-            body=self.driver.get_screenshot_as_png(),
-            name=screenshot_name,
-            attachment_type=AttachmentType.PNG
-        )
+        # Создаем папку screenshots, если она не существует
+        screenshots_dir = "screenshots"
+        os.makedirs(screenshots_dir, exist_ok=True)
+
+        # Генерируем уникальное имя файла с меткой времени
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_name = f"{screenshot_name}_{timestamp}.png"
+        file_path = os.path.join(screenshots_dir, file_name)
+
+        # Сохраняем скриншот в файл
+        self.driver.save_screenshot(file_path)
+
+        # Прикрепляем скриншот к отчету Allure
+        with open(file_path, "rb") as screenshot_file:
+            allure.attach(
+                body=screenshot_file.read(),
+                name=screenshot_name,
+                attachment_type=AttachmentType.PNG
+            )
 
     def refresh(self):
         """Обновляет страницу и проверяет её загрузку"""
@@ -97,3 +114,23 @@ class BasePage:
             self.logger.error(f"Фактический текст: '{actual_text}'")
             raise  # Перебрасываем исключение для пометки теста как упавшего
 
+    def check_src(self, locator, expected_text):
+        """
+        Проверяет текст элемента.
+        :param locator: Локатор элемента (например, (By.CLASS_NAME, "error-message-container"))
+        :param expected_text: Ожидаемая ссылка для сравнения
+        """
+        img_element = self.find_element(locator)
+        img_src = img_element.get_attribute("src")
+        product_name = img_element.get_attribute("alt")
+        try:
+            assert img_src == expected_text, \
+                f"Ожидалось фото '{expected_text}', но получено '{img_src}'"
+            # Логируем успешную проверку
+            self.logger.info("Фото совпадает")
+        except AssertionError as e:
+            # Логируем ошибку и фактический текст
+            self.make_screenshot(f"Неверное фото у {product_name}")
+            self.logger.error(f"Ошибка проверки фото у {product_name}: {e}")
+            self.logger.error(f"Фактическая ссылка на фото: '{img_src}'")
+            raise  # Перебрасываем исключение для пометки теста как упавшего

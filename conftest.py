@@ -4,7 +4,8 @@ import os
 import json
 from selenium import webdriver
 from datetime import datetime
-
+import pytest
+from logger_all import setup_logger
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -15,6 +16,7 @@ def driver(request):
 
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
+    options.add_argument("--incognito")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
 
@@ -50,10 +52,12 @@ def pytest_runtest_makereport(item, call):
         if driver:
             # Создаем скриншот с уникальным именем
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            screenshot_name = f"failure_{item.name}_{timestamp}"
+            test_name = item.name
+            step_name = rep.longrepr.reprtraceback.repwhen
+            screenshot_name = f"{test_name}||{step_name}_{timestamp}"
 
             # Сохраняем скриншот в файл
-            screenshots_dir = os.path.join("screenshots", datetime.now().strftime("%Y-%m-%d"))
+            screenshots_dir = os.path.join("ERR_screenshots", datetime.now().strftime("%Y-%m-%d"))
             os.makedirs(screenshots_dir, exist_ok=True)
             driver.save_screenshot(os.path.join(screenshots_dir, f"{screenshot_name}.png"))
 
@@ -76,3 +80,40 @@ def load_config():
             return config
     except (FileNotFoundError, json.JSONDecodeError):
         return {"BROWSER": "chrome", "HEADLESS": True}
+
+@pytest.fixture(autouse=True)
+def auto_logging(request):
+    # Инициализация логгера
+    logger = setup_logger(request.node.name)
+
+    # Получаем название из Allure
+    allure_title = request.node.get_closest_marker('allure_title')
+    test_name = allure_title.args[0] if allure_title else request.node.name
+
+    # Логирование начала теста
+    logger.info(f"====== Запуск теста: {test_name} ======")
+
+    yield  # Выполнение теста
+
+    # Определение статуса теста
+    report = getattr(request.node, "rep_call", None)  # Доступ к результатам выполнения теста
+
+    if report:
+        if report.passed:
+            logger.info(f"====== Тест успешно завершен: {test_name} ======")
+        elif report.failed:
+            logger.error(f"====== Тест упал: {test_name} | Причина: {report.longrepr} ======")
+        elif report.skipped:
+            logger.warning(f"====== Тест пропущен: {test_name} ======")
+
+    logger.info("=" * 60)
+
+# Хук для сохранения результатов теста в request.node
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+
+    # Сохраняем результаты каждого этапа теста (setup, call, teardown)
+    if report.when == "call":
+        setattr(item, "rep_call", report)  # Сохраняем результат выполнения теста
