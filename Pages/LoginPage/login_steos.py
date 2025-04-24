@@ -405,13 +405,13 @@ class LoginSteos(BasePage):
         self.delete_invitee(db_name, email)
 
     @allure.step("Удаление данных для проверки 2fa из Базы данных Steos")
-    def delete_from_2fa_STEOS(self, db_name="Steos", email="test123@steos.io"):
+    def delete_from_2fa_STEOS(self, db_name="Steos", email="bespaly.d.i@steos.io"):
         self.logger.info("Удаление аккаунта из Базы данных Steos")
         self.logger.info(f"Поиск person_id в таблице 'contacts' для email: {email} для удаления 2fa")
         user_id = self.get_user_id_from_contacts(db_name, email)
         if user_id:
             self.logger.info(f"Найден person_id: {user_id}")
-            self.delete_from_2fa_STEOS(db_name, user_id)
+            self.delete_on_steos_for_2fa(db_name, user_id)
             self.logger.info(f"Удалены данные для проверки 2fa с email '{email}'")
         else:
             self.logger.error(f"Пользователь с email '{email}' не найден в бд {db_name} для удаления 2fa.")

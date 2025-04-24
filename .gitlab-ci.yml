@@ -1,0 +1,37 @@
+workflow:
+    rules:
+        - if: '$CI_PIPELINE_SOURCE == "push"'
+          when: never
+        - when: always
+stages:
+    - test
+
+run_tests:
+    stage: test
+    image: python
+    before_script:
+        - wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+        - sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+        - apt-get update && apt-get install -y google-chrome-stable
+        - pip install -r requirements.txt
+        - pip install selenium --upgrade
+    script:
+        - echo "ADMIN_LOGIN=$ADMIN_LOGIN" > .env
+        - echo "ADMIN_PASS=$ADMIN_PASS" >> .env
+        - echo "ADMIN_Mail_PASS=$ADMIN_Mail_PASS" >> .env
+        - echo "Test_Login=$Test_Login" >> .env
+        - echo "Test_Pass=$Test_Pass" >> .env
+        - echo "bd_host=$bd_host" >> .env
+        - echo "bd_login=$bd_login" >> .env
+        - echo "bd_pwd=$bd_pwd" >> .env
+        - echo "bd_st_vs_host=$bd_st_vs_host" >> .env
+        - echo "bd_st_vs_login=$bd_st_vs_login" >> .env
+        - echo "bd_st_vs_pwd=$bd_st_vs_pwd" >> .env
+        - pytest -v
+    artifacts:
+        when: always
+        paths:
+            - mail_input.png
+            - a_button_log_in.png
+            - button_log_in.png
+            - pas_input.png

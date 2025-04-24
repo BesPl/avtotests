@@ -5,19 +5,16 @@ from selenium import webdriver
 import pytest
 from logger_all import setup_logger
 from Base.BasePage import BasePage
+from datetime import datetime
+from bot import send_message
 
-
-# Фикстура для основного драйвера (создается всегда)
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def driver(request):
-    """Фикстура для основного драйвера (создается всегда)."""
-    logger = setup_logger(request.node.name)
-    logger.info("Создание основного драйвера...")
-
     config = load_config()
     browser_name = config["BROWSER"].lower()
     headless = config["HEADLESS"]
-
+    if request.node.get_closest_marker("needs_isolation"):
+        pytest.skip("Skipping shared driver for isolated test")
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--incognito")
@@ -35,56 +32,48 @@ def driver(request):
     else:
         driver_instance = webdriver.Chrome(options=options)
 
+    # Используем один экземпляр драйвера
     yield driver_instance
-    logger.info("Закрытие основного драйвера...")
     driver_instance.quit()
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_function(request, driver):
-    """
-    Фикстура для подготовки тестового окружения.
-    Не создает изолированный драйвер автоматически.
-    """
+    """Фикстура для подготовки тестового окружения."""
     request.cls.driver = driver
     yield
     driver.delete_all_cookies()
 
-# Фикстура для изолированного драйвера (создается только для тестов с маркером)
-@pytest.fixture(scope="function")
-def isolated_driver(request):
-    """Фикстура для создания изолированного драйвера."""
-    logger = setup_logger(request.node.name)
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """
+    Хук для сохранения результатов теста в request.node.
+    Добавляет создание скриншотов при ошибках в тестах.
+    """
+    outcome = yield
+    report = outcome.get_result()
 
-    # Проверяем наличие маркера isolated_driver
-    if not request.node.get_closest_marker("isolated_driver"):
-        pytest.skip("Skipping isolated driver setup for non-isolated test")
+    # Сохраняем результат выполнения теста
+    if report.when == "call":
+        setattr(item, "rep_call", report)  # Сохраняем результат выполнения теста
 
-    logger.info("Создание изолированного драйвера...")
+        # Проверяем, что тест завершился с ошибкой и есть драйвер
+        if report.failed and hasattr(item, "funcargs"):
+            driver = item.funcargs.get("driver") or item.funcargs.get("isolated_driver")
+            if driver and isinstance(driver, webdriver.Remote):  # Убедимся, что это Selenium WebDriver
+                # Создаем папку для скриншотов, если она не существует
+                screenshot_folder = "ERR_screenshots"
+                os.makedirs(screenshot_folder, exist_ok=True)
 
-    config = load_config()
-    browser_name = config["BROWSER"].lower()
-    headless = config["HEADLESS"]
+                # Формируем имя файла скриншота
+                test_name = item.name
+                screenshot_file = os.path.join(screenshot_folder, f"{test_name}.png")
 
-    options = webdriver.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--incognito")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
-
-    if headless:
-        options.add_argument("--headless=new")
-
-    # Создаем новый экземпляр драйвера
-    if browser_name == "firefox":
-        driver_instance = webdriver.Firefox(options=options)
-    elif browser_name == "edge":
-        driver_instance = webdriver.Edge(options=options)
-    else:
-        driver_instance = webdriver.Chrome(options=options)
-
-    yield driver_instance
-    logger.info("Закрытие изолированного драйвера...")
-    driver_instance.quit()
+                # Делаем скриншот
+                try:
+                    driver.save_screenshot(screenshot_file)
+                    print(f"Скриншот сохранен: {screenshot_file}")
+                except Exception as e:
+                    print(f"Ошибка при создании скриншота: {e}")
 
 def load_config():
     """Загрузка конфигурации из файла config.json с проверкой обязательных полей"""
@@ -98,27 +87,6 @@ def load_config():
             return config
     except (FileNotFoundError, json.JSONDecodeError):
         return {"BROWSER": "chrome", "HEADLESS": True}
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item):
-    """
-    Создаёт скриншот при ошибке в логе или падении теста.
-    """
-    outcome = yield
-    rep = outcome.get_result()
-    if rep.when == "call" and rep.failed:
-        if hasattr(item, "function"):
-            driver = item.funcargs.get("driver", None)
-            if driver:
-                screenshot_name = f"{item.name}_screenshot.png"
-                screenshot_dir = "ERR_screenshots"
-                os.makedirs(screenshot_dir, exist_ok=True)
-                screenshot_path = os.path.join(screenshot_dir, screenshot_name)
-                driver.save_screenshot(screenshot_path)
-                driver.save_screenshot(screenshot_name)
-                with open(screenshot_name, "rb") as file:
-                    screenshot = file.read()
-                allure.attach(screenshot, name=screenshot_name, attachment_type=allure.attachment_type.PNG)
 
 @pytest.fixture(autouse=True)
 def auto_logging(request):
@@ -147,14 +115,96 @@ def auto_logging(request):
 
     logger.info("=" * 60)
 
-# Хук для сохранения результатов теста в request.node
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    outcome = yield
-    report = outcome.get_result()
+@pytest.fixture(scope="function")
+def isolated_driver(request):
+    """Фикстура для создания дополнительной сессии драйвера."""
+    config = load_config()
+    browser_name = config["BROWSER"].lower()
+    headless = config["HEADLESS"]
 
-    # Сохраняем результаты каждого этапа теста (setup, call, teardown)
-    if report.when == "call":
-        setattr(item, "rep_call", report)  # Сохраняем результат выполнения теста
+    options = webdriver.ChromeOptions()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--incognito")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
 
+    if headless:
+        options.add_argument("--headless=new")
 
+    # Создаем новый экземпляр драйвера
+    if browser_name == "firefox":
+        driver_instance = webdriver.Firefox(options=options)
+    elif browser_name == "edge":
+        driver_instance = webdriver.Edge(options=options)
+    else:
+        driver_instance = webdriver.Chrome(options=options)
+
+    yield driver_instance
+    # Закрываем дополнительную сессию после теста
+    driver_instance.quit()
+
+@pytest.fixture(scope="session", autouse=True)
+def send_summary(request):
+    """
+    Фикстура для отправки сводного отчета после завершения всех тестов.
+    """
+    session = request.session
+
+    # Сохраняем время начала тестовой сессии
+    start_time = datetime.now()
+
+    summary = {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "failed_tests": [],
+        "skipped_tests": []
+    }
+
+    def _send_summary():
+        # Собираем статистику по тестам
+        summary["total"] = len(session.items)
+        for item in session.items:
+            if hasattr(item, "rep_call"):
+                if item.rep_call.passed:
+                    summary["passed"] += 1
+                elif item.rep_call.failed:
+                    summary["failed"] += 1
+                    summary["failed_tests"].append(f"{item.name} (ошибка: {item.rep_call.longrepr})")
+                elif item.rep_call.skipped:
+                    summary["skipped"] += 1
+                    summary["skipped_tests"].append(f"{item.name} (причина: {getattr(item.rep_call, 'wasxfail', 'unknown')})")
+
+        end_time = datetime.now()
+        duration = end_time - start_time
+
+        # Формируем сообщение
+        message = (
+            "📊 Тестирование завершено:\n"
+            f"📜 Всего тестов: {summary['total']}\n"
+            f"✅ Успешно: {summary['passed']}\n"
+            f"❌ Провалено: {summary['failed']}\n"
+            f"⚠️ Пропущено: {summary['skipped']}\n\n"
+            f"⏱ Время выполнения: {duration.seconds // 60} минут {duration.seconds % 60} секунд\n"
+            f"📅 Дата начала: {start_time.date()}\n"
+            f"⏰ Время начала: {start_time.time()}\n\n"
+        )
+
+        # Добавляем информацию о проваленных тестах
+        if summary["failed"] > 0:
+            message += "📝 Проваленные тесты:\n"
+            for test in summary["failed_tests"]:
+                message += f"  - {test}\n"
+
+        # Добавляем информацию о пропущенных тестах
+        if summary["skipped"] > 0:
+            message += "\n📝 Пропущенные тесты:\n"
+            for test in summary["skipped_tests"]:
+                message += f"  - {test}\n"
+
+        # Отправляем сообщение в Telegram
+        send_message(message)
+
+    # Регистрируем финализатор
+    request.addfinalizer(_send_summary)

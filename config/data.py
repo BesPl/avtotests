@@ -5,9 +5,6 @@ load_dotenv()
 
 class Data:
 
-    LOGIN = os.getenv("LOGIN")
-    PASSWORD = os.getenv("PASSWORD")
-    locked_out = os.getenv("locked_out")
     ADMIN_LOGIN = os.getenv("ADMIN_LOGIN")
     ADMIN_PASS = os.getenv("ADMIN_PASS")
     ADMIN_Mail_PASS = os.getenv("ADMIN_Mail_PASS")
@@ -19,3 +16,5 @@ class Data:
     bd_st_vs_host = os.getenv("bd_st_vs_host")
     bd_st_vs_login = os.getenv("bd_st_vs_login")
     bd_st_vs_pwd = os.getenv("bd_st_vs_pwd")
+    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+    CHAT_ID = os.getenv("chat_id")
