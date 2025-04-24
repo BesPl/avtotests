@@ -1,5 +1,3 @@
-# logger_all.py
-
 import logging
 import os
 from datetime import datetime
@@ -9,10 +7,15 @@ LOG_DIR = "logs"  # Папка для логов
 MAX_FILES = 5      # Максимальное количество файлов в день
 MAX_SIZE_MB = 10   # Максимальный общий размер файлов в день (в МБ)
 
+# Глобальная переменная для хранения времени начала записи лога
+CURRENT_LOG_TIME = None
+
 def setup_logger(name):
     """
     Настройка логгера для записи в файл и вывода ошибок в терминал.
     """
+    global CURRENT_LOG_TIME
+
     # Создание директории, если она не существует
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
@@ -32,6 +35,8 @@ def setup_logger(name):
     # Создание логгера
     logger = logging.getLogger(name)  # Используем переданное имя
     logger.setLevel(logging.DEBUG)
+
+    # Если у логгера уже есть обработчики, проверяем, нужно ли создавать новый файл
     if not logger.handlers:
         # Обработчик для терминала (только ошибки)
         console_handler = logging.StreamHandler()
@@ -39,8 +44,13 @@ def setup_logger(name):
         console_handler.setLevel(logging.ERROR)
         logger.addHandler(console_handler)
 
+        # Определяем имя файла лога
+        current_time = datetime.now()
+        if CURRENT_LOG_TIME is None or current_time.minute != CURRENT_LOG_TIME.minute:
+            CURRENT_LOG_TIME = current_time
+        file_name = f"{CURRENT_LOG_TIME.strftime('%H-%M')}.log"
+
         # Обработчик для файла
-        file_name = f"{datetime.now().strftime('%H-%M')}.log"
         file_handler = logging.FileHandler(os.path.join(log_path, file_name), encoding="utf-8")
         file_handler.setFormatter(log_format)
         file_handler.setLevel(logging.DEBUG)

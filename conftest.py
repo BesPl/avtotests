@@ -1,15 +1,19 @@
-import pytest
 import allure
 import os
 import json
 from selenium import webdriver
-from datetime import datetime
 import pytest
 from logger_all import setup_logger
+from Base.BasePage import BasePage
 
 
-@pytest.fixture(scope="session", autouse=True)
+# Фикстура для основного драйвера (создается всегда)
+@pytest.fixture(scope="session")
 def driver(request):
+    """Фикстура для основного драйвера (создается всегда)."""
+    logger = setup_logger(request.node.name)
+    logger.info("Создание основного драйвера...")
+
     config = load_config()
     browser_name = config["BROWSER"].lower()
     headless = config["HEADLESS"]
@@ -31,42 +35,56 @@ def driver(request):
     else:
         driver_instance = webdriver.Chrome(options=options)
 
-    # Используем один экземпляр драйвера
     yield driver_instance
+    logger.info("Закрытие основного драйвера...")
     driver_instance.quit()
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_function(request, driver):
-    """Фикстура для подготовки тестового окружения."""
+    """
+    Фикстура для подготовки тестового окружения.
+    Не создает изолированный драйвер автоматически.
+    """
     request.cls.driver = driver
     yield
     driver.delete_all_cookies()
 
-# Автоматическое создание скриншота при падении теста
-@pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    outcome = yield
-    rep = outcome.get_result()
-    if rep.when == "call" and rep.failed:
-        driver = getattr(item, "driver", None) or getattr(item.cls, "driver", None)
-        if driver:
-            # Создаем скриншот с уникальным именем
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            test_name = item.name
-            step_name = rep.longrepr.reprtraceback.repwhen
-            screenshot_name = f"{test_name}||{step_name}_{timestamp}"
+# Фикстура для изолированного драйвера (создается только для тестов с маркером)
+@pytest.fixture(scope="function")
+def isolated_driver(request):
+    """Фикстура для создания изолированного драйвера."""
+    logger = setup_logger(request.node.name)
 
-            # Сохраняем скриншот в файл
-            screenshots_dir = os.path.join("ERR_screenshots", datetime.now().strftime("%Y-%m-%d"))
-            os.makedirs(screenshots_dir, exist_ok=True)
-            driver.save_screenshot(os.path.join(screenshots_dir, f"{screenshot_name}.png"))
+    # Проверяем наличие маркера isolated_driver
+    if not request.node.get_closest_marker("isolated_driver"):
+        pytest.skip("Skipping isolated driver setup for non-isolated test")
 
-            # Прикрепляем к Allure
-            allure.attach(
-                body=driver.get_screenshot_as_png(),
-                name=screenshot_name,
-                attachment_type=allure.attachment_type.PNG
-            )
+    logger.info("Создание изолированного драйвера...")
+
+    config = load_config()
+    browser_name = config["BROWSER"].lower()
+    headless = config["HEADLESS"]
+
+    options = webdriver.ChromeOptions()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--incognito")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
+
+    if headless:
+        options.add_argument("--headless=new")
+
+    # Создаем новый экземпляр драйвера
+    if browser_name == "firefox":
+        driver_instance = webdriver.Firefox(options=options)
+    elif browser_name == "edge":
+        driver_instance = webdriver.Edge(options=options)
+    else:
+        driver_instance = webdriver.Chrome(options=options)
+
+    yield driver_instance
+    logger.info("Закрытие изолированного драйвера...")
+    driver_instance.quit()
 
 def load_config():
     """Загрузка конфигурации из файла config.json с проверкой обязательных полей"""
@@ -80,6 +98,27 @@ def load_config():
             return config
     except (FileNotFoundError, json.JSONDecodeError):
         return {"BROWSER": "chrome", "HEADLESS": True}
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item):
+    """
+    Создаёт скриншот при ошибке в логе или падении теста.
+    """
+    outcome = yield
+    rep = outcome.get_result()
+    if rep.when == "call" and rep.failed:
+        if hasattr(item, "function"):
+            driver = item.funcargs.get("driver", None)
+            if driver:
+                screenshot_name = f"{item.name}_screenshot.png"
+                screenshot_dir = "ERR_screenshots"
+                os.makedirs(screenshot_dir, exist_ok=True)
+                screenshot_path = os.path.join(screenshot_dir, screenshot_name)
+                driver.save_screenshot(screenshot_path)
+                driver.save_screenshot(screenshot_name)
+                with open(screenshot_name, "rb") as file:
+                    screenshot = file.read()
+                allure.attach(screenshot, name=screenshot_name, attachment_type=allure.attachment_type.PNG)
 
 @pytest.fixture(autouse=True)
 def auto_logging(request):
@@ -117,3 +156,5 @@ def pytest_runtest_makereport(item, call):
     # Сохраняем результаты каждого этапа теста (setup, call, teardown)
     if report.when == "call":
         setattr(item, "rep_call", report)  # Сохраняем результат выполнения теста
+
+

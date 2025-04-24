@@ -8,6 +8,9 @@ import allure
 class InventoryPage(BasePage):
     PAGE_URL = Links.INVENTORY_PAGE
 
+
+
+
 class Sauce_Labs_Backpack(BasePage):
     PAGE_URL = Links.INVENTORY_PAGE
     name_product = (By.CSS_SELECTOR, '*[data-test="inventory-item-name"]')
