@@ -27,11 +27,18 @@ run_tests:
         - echo "bd_st_vs_host=$bd_st_vs_host" >> .env
         - echo "bd_st_vs_login=$bd_st_vs_login" >> .env
         - echo "bd_st_vs_pwd=$bd_st_vs_pwd" >> .env
-        - pytest -v
+        - pytest -n 2 -v
+    after_script:
+        - |
+            # Отправляем статус выполнения в Telegram
+            STATUS="✅ Тесты успешно пройдены"
+            if [ $? -ne 0 ]; then
+              STATUS="❌ Ошибка при выполнении тестов"
+            fi
+            MESSAGE="$STATUS%0AПроект: %CI_PROJECT_NAME%%0AПайплайн: %CI_PIPELINE_ID%"
+            curl -s -X POST https://api.telegram.org/bot $TELEGRAM_BOT_TOKEN/sendMessage -d chat_id=$TELEGRAM_CHAT_ID -d text="$MESSAGE"
     artifacts:
         when: always
         paths:
-            - mail_input.png
-            - a_button_log_in.png
-            - button_log_in.png
-            - pas_input.png
+            - ERR_screenshots/
+            - logs/
