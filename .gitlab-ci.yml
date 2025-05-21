@@ -27,8 +27,11 @@ run_tests:
         - echo "bd_st_vs_host=$bd_st_vs_host" >> .env
         - echo "bd_st_vs_login=$bd_st_vs_login" >> .env
         - echo "bd_st_vs_pwd=$bd_st_vs_pwd" >> .env
+        - echo "bd_st_vs_pwd=$TELEGRAM_TOKEN" >> .env
+        - echo "bd_st_vs_pwd=$CHAT_ID" >> .env
         - pytest -n 2 -v
     after_script:
+        - printf
         - |
             # Отправляем статус выполнения в Telegram
             STATUS="✅ Тесты успешно пройдены"
