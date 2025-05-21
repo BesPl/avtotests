@@ -215,7 +215,7 @@ def send_summary(request):
     # Добавляем финализатор с небольшой задержкой
     def on_exit():
         import time
-        time.sleep(2)  # Даем системе немного времени на закрытие драйвера
+        time.sleep(5)  # Даем системе немного времени на закрытие драйвера
         _send_summary()
 
     request.addfinalizer(on_exit)
