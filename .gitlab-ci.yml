@@ -1,47 +1,72 @@
 workflow:
-    rules:
-        - if: '$CI_PIPELINE_SOURCE == "push"'
-          when: never
-        - when: always
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: never
+    - when: always
+
 stages:
-    - test
+  - test
 
 run_tests:
-    stage: test
-    image: python
-    before_script:
-        - wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-        - sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-        - apt-get update && apt-get install -y google-chrome-stable
-        - pip install -r requirements.txt
-        - pip install selenium --upgrade
-    script:
-        - echo "ADMIN_LOGIN=$ADMIN_LOGIN" > .env
-        - echo "ADMIN_PASS=$ADMIN_PASS" >> .env
-        - echo "ADMIN_Mail_PASS=$ADMIN_Mail_PASS" >> .env
-        - echo "Test_Login=$Test_Login" >> .env
-        - echo "Test_Pass=$Test_Pass" >> .env
-        - echo "bd_host=$bd_host" >> .env
-        - echo "bd_login=$bd_login" >> .env
-        - echo "bd_pwd=$bd_pwd" >> .env
-        - echo "bd_st_vs_host=$bd_st_vs_host" >> .env
-        - echo "bd_st_vs_login=$bd_st_vs_login" >> .env
-        - echo "bd_st_vs_pwd=$bd_st_vs_pwd" >> .env
-        - echo "TELEGRAM_TOKEN=$TELEGRAM_TOKEN" >> .env
-        - echo "CHAT_ID=$CHAT_ID" >> .env
-        - pytest -n 2 -v
-    after_script:
-        - cat .env
-        - |
-            # Отправляем статус выполнения в Telegram
-            STATUS="✅ Тесты успешно пройдены"
-            if [ $? -ne 0 ]; then
-              STATUS="❌ Ошибка при выполнении тестов"
-            fi
-            MESSAGE="$STATUS%0AПроект: %CI_PROJECT_NAME%%0AПайплайн: %CI_PIPELINE_ID%"
-            curl -s -X POST https://api.telegram.org/bot $TELEGRAM_TOKEN/sendMessage -d chat_id=$CHAT_ID -d text="$MESSAGE"
-    artifacts:
-        when: always
-        paths:
-            - ERR_screenshots/
-            - logs/
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    # Установка Chrome (без устаревших команд)
+    - apt-get update && apt-get install -y wget gnupg
+    - wget -qO - https://dl.google.com/linux/linux_signing_key.pub  | gpg --dearmor > /usr/share/keyrings/google-chrome.gpg
+    - echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+    - apt-get update && apt-get install -y google-chrome-stable
+
+    # Установка зависимостей
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+    - pip install selenium --upgrade
+
+    # Создание необходимых директорий
+    - mkdir -p ERR_screenshots logs
+
+    # Генерация .env
+    - |
+      cat <<EOL > .env
+      ADMIN_LOGIN=$ADMIN_LOGIN
+      ADMIN_PASS=$ADMIN_PASS
+      ADMIN_Mail_PASS=$ADMIN_Mail_PASS
+      Test_Login=$Test_Login
+      Test_Pass=$Test_Pass
+      bd_host=$bd_host
+      bd_login=$bd_login
+      bd_pwd=$bd_pwd
+      bd_st_vs_host=$bd_st_vs_host
+      bd_st_vs_login=$bd_st_vs_login
+      bd_st_vs_pwd=$bd_st_vs_pwd
+      TELEGRAM_TOKEN=$TELEGRAM_TOKEN
+      CHAT_ID=$CHAT_ID
+      EOL
+
+  script:
+    - pytest -n 2 -v
+
+  after_script:
+  - echo "Содержимое .env:"
+  - cat .env
+  - |
+      # Отправляем статус выполнения в Telegram
+      EXIT_CODE=0
+      STATUS="✅ Тесты успешно пройдены"
+      if [ $? -ne 0 ]; then
+        STATUS="❌ Ошибка при выполнении тестов"
+        EXIT_CODE=1
+      fi
+
+      MESSAGE="$STATUS%0AПроект: ${CI_PROJECT_NAME}%0AПайплайн: ${CI_PIPELINE_ID}"
+      curl -s -X POST "https://api.telegram.org/bot ${TELEGRAM_TOKEN}/sendMessage" \
+           -d chat_id="${CHAT_ID}" \
+           -d text="$MESSAGE"
+
+      exit $EXIT_CODE
+
+  artifacts:
+    when: always
+    paths:
+      - ERR_screenshots/
+      - logs/

@@ -143,18 +143,11 @@ def isolated_driver(request):
     # Закрываем дополнительную сессию после теста
     driver_instance.quit()
 
-@pytest.fixture(scope="session", autouse=True)
-def send_summary(request):
-    """
-    Фикстура для отправки сводного отчета после завершения всех тестов.
-    """
-    session = request.session
-
-    # Сохраняем время начала тестовой сессии
-    start_time = datetime.now()
-
+@pytest.hookimpl(trylast=True)
+def pytest_terminal_summary(*args, **kwargs):
+    session = args[0]
     summary = {
-        "total": 0,
+        "total": len(session.items),
         "passed": 0,
         "failed": 0,
         "skipped": 0,
@@ -162,60 +155,41 @@ def send_summary(request):
         "skipped_tests": []
     }
 
-    def _send_summary():
-        # Собираем статистику по тестам
-        summary["total"] = len(session.items)
-        for item in session.items:
-            if hasattr(item, "rep_call"):
-                report = item.rep_call
-                if report.passed:
-                    summary["passed"] += 1
-                elif report.failed:
-                    summary["failed"] += 1
-                    summary["failed_tests"].append(f"{item.name} (ошибка: {report.longrepr})")
-                elif report.skipped:
-                    summary["skipped"] += 1
-                    reason = getattr(report, "wasxfail", "unknown")
-                    summary["skipped_tests"].append(f"{item.name} (причина: {reason})")
+    for item in session.items:
+        if hasattr(item, "rep_call"):
+            report = item.rep_call
+            if report.passed:
+                summary["passed"] += 1
+            elif report.failed:
+                summary["failed"] += 1
+                summary["failed_tests"].append(f"{item.name} (ошибка: {report.longrepr})")
+            elif report.skipped:
+                summary["skipped"] += 1
+                reason = getattr(report, "wasxfail", "unknown")
+                summary["skipped_tests"].append(f"{item.name} (причина: {reason})")
 
-        end_time = datetime.now()
-        duration = end_time - start_time
+    message = (
+        "*📊 Итоговый отчет*\n"
+        f"📜 Всего тестов: {summary['total']}\n"
+        f"✅ Успешно: {summary['passed']}\n"
+        f"❌ Провалено: {summary['failed']}\n"
+        f"⚠️ Пропущено: {summary['skipped']}\n\n"
+    )
 
-        # Формируем сообщение
-        message = (
-            "📊 Тестирование завершено:\n"
-            f"📜 Всего тестов: {summary['total']}\n"
-            f"✅ Успешно: {summary['passed']}\n"
-            f"❌ Провалено: {summary['failed']}\n"
-            f"⚠️ Пропущено: {summary['skipped']}\n\n"
-            f"⏱ Время выполнения: {duration.seconds // 60} мин {duration.seconds % 60} сек\n"
-            f"📅 Дата начала: {start_time.date()}\n"
-            f"⏰ Время начала: {start_time.strftime('%H:%M:%S')}\n\n"
-        )
+    if summary["failed"] > 0:
+        message += "*📝 Проваленные тесты:*\n"
+        for test in summary["failed_tests"]:
+            message += f"- `{test}`\n"
 
-        # Добавляем информацию о проваленных тестах
-        if summary["failed"] > 0:
-            message += "📝 Проваленные тесты:\n"
-            for test in summary["failed_tests"]:
-                message += f"  - {test}\n"
+    try:
+        send_message(message)
+    except Exception as e:
+        print(f"Ошибка при отправке отчета: {e}")
 
-        # Добавляем информацию о пропущенных тестах
-        if summary["skipped"] > 0:
-            message += "\n📝 Пропущенные тесты:\n"
-            for test in summary["skipped_tests"]:
-                message += f"  - {test}\n"
-
-        # Отправляем сообщение в Telegram
-        try:
-            send_message(message)
-            print("Сводный отчет отправлен через send_message.")
-        except Exception as e:
-            print(f"Ошибка при отправке сводного отчета: {e}")
-
-    # Добавляем финализатор с небольшой задержкой
-    def on_exit():
-        import time
-        time.sleep(5)  # Даем системе немного времени на закрытие драйвера
-        _send_summary()
-
-    request.addfinalizer(on_exit)
+    # # Добавляем финализатор с небольшой задержкой
+    # def on_exit():
+    #     import time
+    #     time.sleep(5)  # Даем системе немного времени на закрытие драйвера
+    #     _send_summary()
+    #
+    # request.addfinalizer(on_exit)
