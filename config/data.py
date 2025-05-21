@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-
+# Allure plugin надо скачать
 load_dotenv()
 
 class Data:

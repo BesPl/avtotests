@@ -1,4 +1,4 @@
 {
   "BROWSER": "Chrome",
-  "HEADLESS": false
+  "HEADLESS": true
 }

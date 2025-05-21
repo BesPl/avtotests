@@ -167,14 +167,16 @@ def send_summary(request):
         summary["total"] = len(session.items)
         for item in session.items:
             if hasattr(item, "rep_call"):
-                if item.rep_call.passed:
+                report = item.rep_call
+                if report.passed:
                     summary["passed"] += 1
-                elif item.rep_call.failed:
+                elif report.failed:
                     summary["failed"] += 1
-                    summary["failed_tests"].append(f"{item.name} (ошибка: {item.rep_call.longrepr})")
-                elif item.rep_call.skipped:
+                    summary["failed_tests"].append(f"{item.name} (ошибка: {report.longrepr})")
+                elif report.skipped:
                     summary["skipped"] += 1
-                    summary["skipped_tests"].append(f"{item.name} (причина: {getattr(item.rep_call, 'wasxfail', 'unknown')})")
+                    reason = getattr(report, "wasxfail", "unknown")
+                    summary["skipped_tests"].append(f"{item.name} (причина: {reason})")
 
         end_time = datetime.now()
         duration = end_time - start_time
@@ -186,9 +188,9 @@ def send_summary(request):
             f"✅ Успешно: {summary['passed']}\n"
             f"❌ Провалено: {summary['failed']}\n"
             f"⚠️ Пропущено: {summary['skipped']}\n\n"
-            f"⏱ Время выполнения: {duration.seconds // 60} минут {duration.seconds % 60} секунд\n"
+            f"⏱ Время выполнения: {duration.seconds // 60} мин {duration.seconds % 60} сек\n"
             f"📅 Дата начала: {start_time.date()}\n"
-            f"⏰ Время начала: {start_time.time()}\n\n"
+            f"⏰ Время начала: {start_time.strftime('%H:%M:%S')}\n\n"
         )
 
         # Добавляем информацию о проваленных тестах
@@ -204,7 +206,16 @@ def send_summary(request):
                 message += f"  - {test}\n"
 
         # Отправляем сообщение в Telegram
-        send_message(message)
+        try:
+            send_message(message)
+            print("Сводный отчет отправлен через send_message.")
+        except Exception as e:
+            print(f"Ошибка при отправке сводного отчета: {e}")
 
-    # Регистрируем финализатор
-    request.addfinalizer(_send_summary)
+    # Добавляем финализатор с небольшой задержкой
+    def on_exit():
+        import time
+        time.sleep(2)  # Даем системе немного времени на закрытие драйвера
+        _send_summary()
+
+    request.addfinalizer(on_exit)
