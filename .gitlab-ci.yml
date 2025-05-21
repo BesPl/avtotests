@@ -5,7 +5,7 @@ workflow:
     - when: always
 
 stages:
-  - test
+  - tests
 
 run_tests:
   stage: test
